@@ -2,6 +2,8 @@
 
 An educational implementation of a production-ready load balancer with sticky sessions, built from scratch in Go.
 
+**📖 Full Course:** [Load Balancing and Sticky Sessions: A Complete Course](https://www.mehdi.cz/blog/load-balancer-sticky-sessions-course)
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
@@ -71,6 +73,7 @@ A **load balancer** distributes incoming network traffic across multiple backend
 This implementation supports two algorithms:
 
 **1. Round-Robin** - Simple rotation through backends:
+
 ```
 Request 1 → Backend 1
 Request 2 → Backend 2
@@ -79,6 +82,7 @@ Request 4 → Backend 1 (cycle repeats)
 ```
 
 **2. Weighted Round-Robin** - Traffic distribution based on server capacity:
+
 ```
 Backend 1 (weight 5): ~50% traffic
 Backend 2 (weight 3): ~30% traffic
@@ -94,6 +98,7 @@ Backend 3 (weight 2): ~20% traffic
 ### Why Do We Need Sticky Sessions?
 
 Some applications store session state locally on a server (e.g., in-memory sessions, WebSocket connections, local caches). Without sticky sessions:
+
 - User logs in on Server 1 (session created on Server 1)
 - Next request goes to Server 2 (no session exists there)
 - User is unexpectedly logged out!
@@ -141,12 +146,14 @@ Only for **multiple load balancer instances** (horizontal scaling). For single L
 ## Features
 
 ### Core Features
+
 - ✅ Round-robin and weighted round-robin load balancing
 - ✅ Cookie-based sticky sessions (in-memory storage)
 - ✅ Health checking with automatic failover
 - ✅ Session expiration management
 
 ### Advanced Features
+
 - ✅ **TOML Configuration** - Easy-to-edit config files
 - ✅ **Rate Limiting** - Token bucket algorithm (100ns overhead)
 - ✅ **Prometheus Metrics** - Real-time monitoring
@@ -178,6 +185,7 @@ type Backend struct {
 ```
 
 **Responsibilities:**
+
 - Health checking (HTTP GET to backend URL)
 - Proxying requests to backend
 - Tracking alive/dead state
@@ -279,14 +287,17 @@ path = "/metrics"
 ### Algorithm Choice
 
 **Round-Robin:**
+
 ```toml
 [loadbalancer]
 algorithm = "round-robin"
 ```
+
 - Simple, fair distribution
 - Best for homogeneous backends (same capacity)
 
 **Weighted Round-Robin:**
+
 ```toml
 [loadbalancer]
 algorithm = "weighted-round-robin"
@@ -300,6 +311,7 @@ weight = 3  # Gets 30% traffic
 [[loadbalancer.backends]]
 weight = 2  # Gets 20% traffic
 ```
+
 - Distribution based on server capacity
 - Best for heterogeneous backends (different specs)
 
@@ -314,11 +326,13 @@ weight = 2  # Gets 20% traffic
 **Why WebSockets Need Sticky Sessions:**
 
 WebSockets are **long-lived, stateful connections**. Once established:
+
 - The connection stays open indefinitely
 - Server keeps connection-specific state
 - Connection cannot be "transferred" between servers
 
 **Without sticky sessions:**
+
 ```
 Client: WebSocket connect → Backend-1
 (After 5 minutes...)
@@ -328,6 +342,7 @@ Backend-2: "I don't have this connection!"
 ```
 
 **With sticky sessions:**
+
 ```
 Client: WebSocket connect → LB (no cookie)
 LB: Route to Backend-1, set cookie LB_SESSION=abc123
@@ -343,6 +358,7 @@ Message delivered successfully ✓
 ### Testing WebSocket Support
 
 **Start WebSocket backends:**
+
 ```bash
 # Terminal 1-3
 go run cmd/backend-ws/main.go -port 8081 -name ws-backend-1
@@ -354,17 +370,19 @@ go run cmd/server/main.go -config configs/config.toml
 ```
 
 **Connect WebSocket:**
+
 ```bash
 # Install: npm install -g wscat
 wscat -c ws://localhost:8080/ws
 ```
 
 **Send messages:**
+
 ```
 > Hello
 < [ws-backend-1] Echo: Hello
 
-> World  
+> World
 < [ws-backend-1] Echo: World
 
 > Test
@@ -372,6 +390,7 @@ wscat -c ws://localhost:8080/ws
 ```
 
 **Check backendlogs - ALL messages on SAME backend:**
+
 ```
 [ws-backend-1] WebSocket connection established
 [ws-backend-1] Received: Hello
@@ -383,6 +402,7 @@ wscat -c ws://localhost:8080/ws
 
 **1. Session TTL:**
 WebSockets can live for hours. Set session TTL longer:
+
 ```toml
 [loadbalancer]
 session_ttl = "24h"  # For long-lived connections
@@ -390,6 +410,7 @@ session_ttl = "24h"  # For long-lived connections
 
 **2. Backend Restarts:**
 When a backend restarts, its WebSockets disconnect. Client must reconnect:
+
 ```javascript
 // Client-side reconnection logic
 ws.onclose = () => {
@@ -446,6 +467,7 @@ for i in {1..5}; do curl -b client2.txt -s http://localhost:8080/ | grep "Hello 
 ```
 
 You'll see:
+
 ```
 Client 1: backend-1, backend-1, backend-1, backend-1, backend-1
 Client 2: backend-3, backend-3, backend-3, backend-3, backend-3
@@ -497,7 +519,7 @@ This proves weighted round-robin distributes traffic according to weights.
 func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     // Step 1: Check for session cookie
     targetBackend := lb.getStickyBackend(r)
-    
+
     // Step 2: If no session, use round-robin
     if targetBackend == nil {
         targetBackend = lb.getNextBackend()
@@ -508,7 +530,7 @@ func (lb *LoadBalancer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
         // Step 3: Create new session
         lb.setStickySession(w, r, targetBackend.ServerID)
     }
-    
+
     // Step 4: Route to backend
     targetBackend.ReverseProxy.ServeHTTP(w, r)
 }
@@ -524,30 +546,30 @@ func (lb *LoadBalancer) getStickyBackend(r *http.Request) *backend.Backend {
     if err != nil {
         return nil  // No cookie = new session
     }
-    
+
     // 2. Look up in memory map
     lb.mux.RLock()
     session, exists := lb.StickySession[cookie.Value]
     lb.mux.RUnlock()
-    
+
     if !exists {
         return nil  // Invalid session
     }
-    
+
     // 3. Check expiration
     if time.Now().After(session.ExpiresAt) {
         delete(lb.StickySession, cookie.Value)
         return nil  // Expired
     }
-    
+
     // 4. Find backend
     backend := lb.getBackendByID(session.BackendID)
-    
+
     // 5. Check backend health
     if backend != nil && backend.IsAlive() {
         return backend  // ✅ Valid sticky backend
     }
-    
+
     return nil  // Backend down
 }
 ```
@@ -569,12 +591,14 @@ map[string]*StickySession{
 ```
 
 **Why in-memory?**
+
 - ✅ Simple (no Redis/DB dependency)
 - ✅ Fast (~10ns lookup)
 - ✅ Tiny footprint (62 bytes per session)
 
 **When would you need external storage?**
 Only for **multiple load balancer instances**:
+
 ```
 Problem: Multiple LBs, different sessions
 LB-1: sessions["abc123"] = "backend-1"
@@ -600,6 +624,7 @@ LB-2: reads from Redis → "backend-1"
 ### For Production Deployment
 
 **Security:**
+
 ```toml
 [server.tls]
 enabled = true
@@ -612,11 +637,13 @@ format = "json" # Machine-parseable
 ```
 
 **High Availability:**
+
 - Run multiple load balancer instances
 - Use a load balancer in front (Nginx, AWS ALB, CloudFlare)
 - Add external session storage (Redis) for multi-LB setups
 
 **Monitoring:**
+
 ```bash
 # Prometheus metrics
 curl http://localhost:9090/metrics
@@ -631,12 +658,14 @@ curl http://localhost:9090/metrics
 ### When NOT to Use This
 
 For **production traffic**, consider established solutions:
+
 - **Nginx** - Battle-tested, high-performance
 - **HAProxy** - Feature-rich, widely used
 - **Traefik** - Modern, cloud-native
 - **AWS ALB / GCP Load Balancing** - Managed services
 
 **Use this project for:**
+
 - Learning how load balancers work
 - Understanding sticky sessions
 - Educational purposes

@@ -161,51 +161,7 @@ Only for **multiple load balancer instances** (horizontal scaling). For single L
 
 ### Component Overview
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Load Balancer                       │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │            ServeHTTP (Entry Point)                │   │
-│  │  • Check for session cookie                       │   │
-│  │  • Route to backend (sticky or round-robin)      │   │
-│  │  • Set cookie if new session                      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                         ↓                                │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │          StickySession Map (In-Memory)            │   │
-│  │  "abc123" → {BackendID: "backend-1", ExpiresAt}  │   │
-│  │  "def456" → {BackendID: "backend-2", ExpiresAt}   │   │
-│  └──────────────────────────────────────────────────┘   │
-│                         ↓                                │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │           Backend Pool (Weighted)                 │   │
-│  │  • Backend 1 (weight=3, alive=true)               │   │
-│  │  • Backend 2 (weight=2, alive=true)               │   │
-│  │  • Backend 3 (weight=1, alive=false)             │   │
-│  └──────────────────────────────────────────────────┘   │
-│                         ↓                                │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │         Rate Limiter (Token Bucket)               │   │
-│  │  • 100 requests/second per client                 │   │
-│  │  • Burst capacity: 200                            │   │
-│  └──────────────────────────────────────────────────┘   │
-│                         ↓                                │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │         Reverse Proxy (Go httputil)               │   │
-│  │  • Forwards HTTP requests                         │   │
-│  │  • Handles WebSocket upgrades                     │   │
-│  │  • Streams responses                              │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-        ┌──────────────────┬──────────────────┐
-        ↓                  ↓                  ↓
-   ┌─────────┐       ┌─────────┐       ┌─────────┐
-   │Backend 1│       │Backend 2│       │Backend 3│
-   │ Port    │       │ Port    │       │ Port    │
-   │ 8081    │       │ 8082    │       │ 8083    │
-   └─────────┘       └─────────┘       └─────────┘
-```
+![Architecture Diagram](https://github.com/user-attachments/assets/53857cdb-8875-4d1b-a11a-4b494725dc5a)
 
 ### Backend Pool (`pkg/backend/backend.go`)
 

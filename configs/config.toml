@@ -1,0 +1,50 @@
+[server]
+port = 8080
+host = "0.0.0.0"
+read_timeout = "10s"
+write_timeout = "10s"
+
+[server.tls]
+enabled = false
+cert_file = ""
+key_file = ""
+
+[loadbalancer]
+algorithm = "weighted-round-robin"
+session_ttl = "30m"
+health_check_interval = "10s"
+health_check_timeout = "2s"
+
+[[loadbalancer.backends]]
+id = "backend-1"
+url = "http://localhost:8081"
+weight = 3
+enabled = true
+
+[[loadbalancer.backends]]
+id = "backend-2"
+url = "http://localhost:8082"
+weight = 2
+enabled = true
+
+[[loadbalancer.backends]]
+id = "backend-3"
+url = "http://localhost:8083"
+weight = 1
+enabled = true
+
+[logging]
+level = "info"
+format = "json"
+output = "stdout"
+
+[ratelimit]
+enabled = true
+requests_per_second = 100.0
+burst = 200
+cleanup_interval = "1m"
+
+[metrics]
+enabled = true
+port = 9090
+path = "/metrics"
